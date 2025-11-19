@@ -14,6 +14,7 @@ import torch
 
 from src.rewards.custom_reward import CustomReward
 from src.state_setters.custom_state_setter import CustomStateSetter
+from src.utils import RLGymSimWrapper
 
 
 def load_config(config_path: str = "configs/training_config.yaml"):
@@ -61,9 +62,10 @@ def main():
 
     # Create environment
     print("Creating RLGym environment...")
-    # RLGym-Sim environments work best without additional vectorization
-    # SB3 will handle single environments automatically
-    env = create_rlgym_env(config)
+    rlgym_env = create_rlgym_env(config)
+
+    # Wrap in Gymnasium-compatible wrapper for SB3
+    env = RLGymSimWrapper(rlgym_env)
 
     # Create checkpoint callback
     checkpoint_callback = CheckpointCallback(
