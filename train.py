@@ -10,7 +10,7 @@ from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutConditi
 from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor, VecNormalize, VecCheckNan
 
 from src.rewards.custom_reward import CustomReward
 from src.state_setters.custom_state_setter import CustomStateSetter
@@ -55,7 +55,8 @@ def main():
 
     # Create environment
     print("Creating RLGym environment...")
-    env = create_rlgym_env(config)
+    # Vectorize the environment (required for SB3)
+    env = DummyVecEnv([lambda: create_rlgym_env(config)])
 
     # Wrap environment with monitoring and normalization
     env = VecMonitor(env)
