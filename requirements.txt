@@ -4,8 +4,14 @@ git+https://github.com/AechPro/rocket-league-gym-sim@main#egg=rlgym-sim
 stable-baselines3>=2.0.0
 gymnasium>=0.28.0
 
-# PyTorch (CPU version - change to GPU version if needed)
-# For GPU, install from: https://pytorch.org/get-started/locally/
+# PyTorch - IMPORTANT: For GPU support, install CUDA version first
+# CPU version (slower training):
+#   torch>=2.0.0
+# GPU version (CUDA 11.8 - recommended for training):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# GPU version (CUDA 12.1):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# For other CUDA versions, visit: https://pytorch.org/get-started/locally/
 torch>=2.0.0
 numpy>=1.24.0
 

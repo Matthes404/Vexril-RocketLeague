@@ -10,7 +10,8 @@ from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutConditi
 from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor, VecNormalize, VecCheckNan
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor, VecCheckNan
+import torch
 
 from src.rewards.custom_reward import CustomReward
 from src.state_setters.custom_state_setter import CustomStateSetter
@@ -47,6 +48,12 @@ def main():
     # Load configuration
     config = load_config()
 
+    # Check for GPU availability
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    if device == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+
     # Create directories
     models_dir = Path(config['paths']['models_dir'])
     logs_dir = Path(config['paths']['logs_dir'])
@@ -58,9 +65,9 @@ def main():
     # Vectorize the environment (required for SB3)
     env = DummyVecEnv([lambda: create_rlgym_env(config)])
 
-    # Wrap environment with monitoring and normalization
+    # Wrap environment with monitoring
+    # Note: VecNormalize removed as RLGym-Sim handles obs normalization internally
     env = VecMonitor(env)
-    env = VecNormalize(env, norm_obs=True, norm_reward=True)
     env = VecCheckNan(env, raise_exception=True)
 
     # Create checkpoint callback
@@ -78,6 +85,7 @@ def main():
         model = PPO.load(
             str(model_path),
             env=env,
+            device=device,
             tensorboard_log=str(logs_dir)
         )
     else:
@@ -95,6 +103,7 @@ def main():
             ent_coef=config['ppo']['ent_coef'],
             vf_coef=config['ppo']['vf_coef'],
             max_grad_norm=config['ppo']['max_grad_norm'],
+            device=device,
             verbose=1,
             tensorboard_log=str(logs_dir)
         )
@@ -111,9 +120,6 @@ def main():
     final_model_path = models_dir / f"{config['training']['model_name']}_final.zip"
     model.save(str(final_model_path))
     print(f"Training complete! Final model saved to {final_model_path}")
-
-    # Save normalized environment
-    env.save(str(models_dir / "vec_normalize.pkl"))
 
     env.close()
 
