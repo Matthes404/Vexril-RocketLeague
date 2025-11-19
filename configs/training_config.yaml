@@ -1,0 +1,34 @@
+# Training Configuration for Rocket League RL Bot
+
+# Environment settings
+env:
+  game_speed: 100  # 100 = normal speed, higher = faster simulation
+  tick_skip: 8  # Number of physics ticks to skip per action
+  spawn_opponents: true  # Whether to spawn opponent bots
+  team_size: 1  # 1v1, 2v2, or 3v3
+  timeout_seconds: 300  # Max episode length in seconds
+
+# PPO hyperparameters
+ppo:
+  learning_rate: 0.0003  # Learning rate for the optimizer
+  n_steps: 4096  # Number of steps to collect per environment per update
+  batch_size: 256  # Minibatch size for each gradient update
+  n_epochs: 10  # Number of epochs to train on each collected batch
+  gamma: 0.99  # Discount factor
+  gae_lambda: 0.95  # GAE lambda parameter
+  clip_range: 0.2  # Clipping parameter for PPO
+  ent_coef: 0.01  # Entropy coefficient for exploration
+  vf_coef: 0.5  # Value function coefficient in the loss
+  max_grad_norm: 0.5  # Maximum gradient norm for clipping
+
+# Training settings
+training:
+  total_timesteps: 10_000_000  # Total number of training timesteps
+  save_freq: 100_000  # Save model every N steps
+  model_name: "rl_bot"  # Base name for saved models
+  resume_training: false  # Whether to resume from existing checkpoint
+
+# Paths
+paths:
+  models_dir: "./models"  # Directory to save trained models
+  logs_dir: "./logs"  # Directory for tensorboard logs
