@@ -10,7 +10,6 @@ from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutConditi
 from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor, VecCheckNan
 import torch
 
 from src.rewards.custom_reward import CustomReward
@@ -49,10 +48,10 @@ def main():
     config = load_config()
 
     # Check for GPU availability
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Note: PPO with MlpPolicy works better on CPU for this use case
+    # GPU is mainly beneficial for CNN policies
+    device = "cpu"  # Force CPU for better performance with MlpPolicy
     print(f"Using device: {device}")
-    if device == "cuda":
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     # Create directories
     models_dir = Path(config['paths']['models_dir'])
@@ -62,13 +61,9 @@ def main():
 
     # Create environment
     print("Creating RLGym environment...")
-    # Vectorize the environment (required for SB3)
-    env = DummyVecEnv([lambda: create_rlgym_env(config)])
-
-    # Wrap environment with monitoring
-    # Note: VecNormalize removed as RLGym-Sim handles obs normalization internally
-    env = VecMonitor(env)
-    env = VecCheckNan(env, raise_exception=True)
+    # RLGym-Sim environments work best without additional vectorization
+    # SB3 will handle single environments automatically
+    env = create_rlgym_env(config)
 
     # Create checkpoint callback
     checkpoint_callback = CheckpointCallback(
