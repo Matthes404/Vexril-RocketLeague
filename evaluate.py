@@ -6,6 +6,7 @@ import numpy as np
 import rlgym_sim
 from pathlib import Path
 from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+from rlgym_sim.utils.obs_builders import DefaultObs
 
 from src.agents.rl_bot import RLBot, RandomBot
 from src.rewards.custom_reward import CustomReward
@@ -41,6 +42,7 @@ def evaluate_bot(model_path: str, num_episodes: int = 10, render: bool = False):
             GoalScoredCondition()
         ],
         reward_fn=CustomReward(),
+        obs_builder=DefaultObs(),
         state_setter=CustomStateSetter(),
         copy_gamestate_every_step=True
     )

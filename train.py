@@ -7,6 +7,7 @@ from pathlib import Path
 import rlgym_sim
 from rlgym_sim.utils.gamestates import GameState
 from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
@@ -33,7 +34,7 @@ def create_rlgym_env(config):
             GoalScoredCondition()
         ],
         reward_fn=CustomReward(),
-        obs_builder=None,  # Uses default observation builder
+        obs_builder=DefaultObs(),  # Default observation builder
         state_setter=CustomStateSetter(),
         copy_gamestate_every_step=True  # Improves performance
     )
