@@ -42,8 +42,9 @@ Vexril-RocketLeague/
 ## Prerequisites
 
 - Python 3.8 or higher
-- No Rocket League installation required! (RLGym-Sim uses RocketSim)
-- Works on Windows, Linux, and macOS
+- **Rocket League** (required to extract collision meshes - one-time setup)
+- Windows recommended (for collision mesh extraction)
+- Works on Windows, Linux, and macOS (after obtaining collision meshes)
 
 ## Installation
 
@@ -71,6 +72,22 @@ pip install -r requirements.txt
 - PyTorch and other dependencies
 
 The installation may take a few minutes as it downloads and compiles RocketSim.
+
+4. **Set up collision meshes (REQUIRED)**
+
+RLGym-Sim requires collision mesh files from Rocket League to simulate arena physics. You must extract these from your own copy of Rocket League:
+
+```bash
+# See SETUP_COLLISION_MESHES.md for detailed instructions
+```
+
+**Quick setup**:
+- Download [RLArenaCollisionDumper](https://github.com/ZealanL/RLArenaCollisionDumper/releases/tag/v1.0.0)
+- Launch Rocket League in Free Play mode
+- Run the dumper executable
+- Move the `collision_meshes` folder to this project directory
+
+**Important**: Without collision meshes, you'll get a `RuntimeError: ROCKETSIM FATAL ERROR: No arena meshes found`. See [SETUP_COLLISION_MESHES.md](SETUP_COLLISION_MESHES.md) for complete instructions.
 
 ## Usage
 
