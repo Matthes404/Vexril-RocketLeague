@@ -13,11 +13,11 @@ ppo:
   n_steps: 4096  # Number of steps to collect per environment per update
   batch_size: 256  # Minibatch size for each gradient update
   n_epochs: 10  # Number of epochs to train on each collected batch
-  gamma: 0.99  # Discount factor
+  gamma: 0.995  # Discount factor (increased from 0.99 for longer-term planning)
   gae_lambda: 0.95  # GAE lambda parameter
   clip_range: 0.2  # Clipping parameter for PPO
-  ent_coef: 0.01  # Entropy coefficient for exploration
-  vf_coef: 0.5  # Value function coefficient in the loss
+  ent_coef: 0.02  # Entropy coefficient (INCREASED from 0.01 for more exploration early on)
+  vf_coef: 1.0  # Value function coefficient (INCREASED from 0.5 to prioritize value learning)
   max_grad_norm: 0.5  # Maximum gradient norm for clipping
 
 # Training settings

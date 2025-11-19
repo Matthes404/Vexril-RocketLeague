@@ -9,12 +9,31 @@ from rlgym_sim.utils.gamestates import GameState
 from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import torch
 
 from src.rewards.custom_reward import CustomReward
 from src.state_setters.custom_state_setter import CustomStateSetter
 from src.utils import RLGymSimWrapper
+
+
+class VecNormalizeCallback(BaseCallback):
+    """
+    Callback to save VecNormalize stats periodically
+    """
+    def __init__(self, save_freq: int, save_path: str, verbose: int = 0):
+        super().__init__(verbose)
+        self.save_freq = save_freq
+        self.save_path = save_path
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.save_freq == 0:
+            if isinstance(self.training_env, VecNormalize):
+                self.training_env.save(self.save_path)
+                if self.verbose > 0:
+                    print(f"Saved VecNormalize stats at step {self.num_timesteps}")
+        return True
 
 
 def load_config(config_path: str = "configs/training_config.yaml"):
@@ -65,14 +84,44 @@ def main():
     rlgym_env = create_rlgym_env(config)
 
     # Wrap in Gymnasium-compatible wrapper for SB3
-    env = RLGymSimWrapper(rlgym_env)
+    base_env = RLGymSimWrapper(rlgym_env)
 
-    # Create checkpoint callback
+    # Wrap in DummyVecEnv (required for VecNormalize)
+    env = DummyVecEnv([lambda: base_env])
+
+    # CRITICAL: Add VecNormalize for observation and reward normalization
+    # This will dramatically improve learning stability and value function performance
+    vecnorm_path = models_dir / f"{config['training']['model_name']}_vecnormalize.pkl"
+
+    if vecnorm_path.exists() and config['training']['resume_training']:
+        print(f"Loading VecNormalize stats from {vecnorm_path}")
+        env = VecNormalize.load(str(vecnorm_path), env)
+    else:
+        print("Creating new VecNormalize wrapper...")
+        env = VecNormalize(
+            env,
+            norm_obs=True,  # Normalize observations
+            norm_reward=True,  # Normalize rewards
+            clip_obs=10.0,  # Clip normalized observations to [-10, 10]
+            clip_reward=10.0,  # Clip normalized rewards to [-10, 10]
+            gamma=config['ppo']['gamma'],  # Use same gamma as PPO
+            epsilon=1e-8
+        )
+
+    # Create callbacks
     checkpoint_callback = CheckpointCallback(
         save_freq=config['training']['save_freq'],
         save_path=str(models_dir),
         name_prefix=config['training']['model_name']
     )
+
+    vecnormalize_callback = VecNormalizeCallback(
+        save_freq=config['training']['save_freq'],
+        save_path=str(vecnorm_path),
+        verbose=1
+    )
+
+    callbacks = [checkpoint_callback, vecnormalize_callback]
 
     # Initialize or load model
     model_path = models_dir / f"{config['training']['model_name']}_latest.zip"
@@ -87,6 +136,18 @@ def main():
         )
     else:
         print("Creating new PPO model...")
+        # Define policy network architecture
+        # Larger networks can learn more complex behaviors
+        policy_kwargs = dict(
+            net_arch=dict(
+                pi=[256, 256, 256],  # Policy network: 3 layers of 256 units
+                vf=[256, 256, 256]   # Value network: 3 layers of 256 units
+            ),
+            activation_fn=torch.nn.ReLU,  # ReLU activation
+            # Initialize with orthogonal initialization (better for RL)
+            ortho_init=True,
+        )
+
         model = PPO(
             policy="MlpPolicy",
             env=env,
@@ -100,6 +161,7 @@ def main():
             ent_coef=config['ppo']['ent_coef'],
             vf_coef=config['ppo']['vf_coef'],
             max_grad_norm=config['ppo']['max_grad_norm'],
+            policy_kwargs=policy_kwargs,
             device=device,
             verbose=1,
             tensorboard_log=str(logs_dir)
@@ -109,7 +171,7 @@ def main():
     print(f"Starting training for {config['training']['total_timesteps']} timesteps...")
     model.learn(
         total_timesteps=config['training']['total_timesteps'],
-        callback=checkpoint_callback,
+        callback=callbacks,
         progress_bar=True
     )
 
@@ -117,6 +179,10 @@ def main():
     final_model_path = models_dir / f"{config['training']['model_name']}_final.zip"
     model.save(str(final_model_path))
     print(f"Training complete! Final model saved to {final_model_path}")
+
+    # Save VecNormalize stats
+    env.save(str(vecnorm_path))
+    print(f"VecNormalize stats saved to {vecnorm_path}")
 
     env.close()
 
