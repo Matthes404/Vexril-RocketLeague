@@ -45,9 +45,17 @@ class RLGymSimWrapper(gym.Env):
             dtype=np.float32
         )
 
-        # Get action space from env
+        # Get action space from env and convert to gymnasium space
         if hasattr(self.env, 'action_space'):
-            self.action_space = self.env.action_space
+            # Convert gym.spaces to gymnasium.spaces
+            env_action_space = self.env.action_space
+            # Create a new gymnasium Box space with the same parameters
+            self.action_space = spaces.Box(
+                low=env_action_space.low,
+                high=env_action_space.high,
+                shape=env_action_space.shape,
+                dtype=env_action_space.dtype
+            )
         else:
             # Default action space for RLGym (8-dimensional continuous)
             self.action_space = spaces.Box(
