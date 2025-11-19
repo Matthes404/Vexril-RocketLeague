@@ -13,7 +13,8 @@ gymnasium>=0.28.0
 #   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 # For other CUDA versions, visit: https://pytorch.org/get-started/locally/
 torch>=2.0.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0  # Pin to <2.0 for compatibility with gym (used by RLGym-Sim)
+setuptools>=65.5.0,<70.0.0  # Avoid setuptools.extern.six issues
 
 # Logging and monitoring
 tensorboard>=2.13.0
