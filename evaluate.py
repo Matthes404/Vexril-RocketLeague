@@ -3,9 +3,9 @@ Evaluation script for testing trained Rocket League bot
 """
 import yaml
 import numpy as np
-import rlgym
+import rlgym_sim
 from pathlib import Path
-from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 
 from src.agents.rl_bot import RLBot, RandomBot
 from src.rewards.custom_reward import CustomReward
@@ -32,8 +32,7 @@ def evaluate_bot(model_path: str, num_episodes: int = 10, render: bool = False):
 
     # Create environment
     print("Creating evaluation environment...")
-    env = rlgym.make(
-        game_speed=100,  # Normal speed for evaluation
+    env = rlgym_sim.make(
         tick_skip=config['env']['tick_skip'],
         spawn_opponents=True,
         team_size=1,
@@ -43,6 +42,7 @@ def evaluate_bot(model_path: str, num_episodes: int = 10, render: bool = False):
         ],
         reward_fn=CustomReward(),
         state_setter=CustomStateSetter(),
+        copy_gamestate_every_step=True
     )
 
     # Load bot
