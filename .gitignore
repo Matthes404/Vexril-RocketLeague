@@ -59,6 +59,7 @@ events.out.tfevents.*
 
 # RLGym specific
 *.replay
+collision_meshes/
 
 # OS
 Thumbs.db
