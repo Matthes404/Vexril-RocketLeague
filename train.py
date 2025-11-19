@@ -1,11 +1,12 @@
 """
-Main training script for the Rocket League RL Bot using RLGym
+Main training script for the Rocket League RL Bot using RLGym-Sim
 """
 import os
 import yaml
 from pathlib import Path
-import rlgym
-from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+import rlgym_sim
+from rlgym_sim.utils.gamestates import GameState
+from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
@@ -22,9 +23,8 @@ def load_config(config_path: str = "configs/training_config.yaml"):
 
 
 def create_rlgym_env(config):
-    """Create and configure the RLGym environment"""
-    env = rlgym.make(
-        game_speed=config['env']['game_speed'],
+    """Create and configure the RLGym-Sim environment"""
+    env = rlgym_sim.make(
         tick_skip=config['env']['tick_skip'],
         spawn_opponents=config['env']['spawn_opponents'],
         team_size=config['env']['team_size'],
@@ -35,6 +35,7 @@ def create_rlgym_env(config):
         reward_fn=CustomReward(),
         obs_builder=None,  # Uses default observation builder
         state_setter=CustomStateSetter(),
+        copy_gamestate_every_step=True  # Improves performance
     )
 
     return env

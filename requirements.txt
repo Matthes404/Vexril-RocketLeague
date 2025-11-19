@@ -1,16 +1,16 @@
-# Core dependencies
-rlgym>=1.2.0
-rlgym-tools>=1.8.0
+# Core dependencies for RLGym with RocketSim
+rocketsim>=1.0.0
+git+https://github.com/AechPro/rocket-league-gym-sim@main#egg=rlgym-sim
 stable-baselines3>=2.0.0
 gymnasium>=0.28.0
 
 # PyTorch (CPU version - change to GPU version if needed)
+# For GPU, install from: https://pytorch.org/get-started/locally/
 torch>=2.0.0
 numpy>=1.24.0
 
 # Logging and monitoring
 tensorboard>=2.13.0
-wandb>=0.15.0
 
 # Utilities
 pyyaml>=6.0

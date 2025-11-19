@@ -3,9 +3,9 @@ Custom state setter for Rocket League bot training
 Sets up initial game states for varied training scenarios
 """
 import numpy as np
-from rlgym.utils.state_setters import StateSetter
-from rlgym.utils.state_setters import DefaultState
-from rlgym.utils.common_values import CEILING_Z, BACK_WALL_Y, SIDE_WALL_X, BALL_RADIUS
+from rlgym_sim.utils.state_setters import StateSetter
+from rlgym_sim.utils.state_setters import DefaultState
+from rlgym_sim.utils.common_values import CEILING_Z, BACK_WALL_Y, SIDE_WALL_X, BALL_RADIUS
 
 
 class CustomStateSetter(StateSetter):

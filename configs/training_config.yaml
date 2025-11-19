@@ -1,8 +1,7 @@
 # Training Configuration for Rocket League RL Bot
 
-# Environment settings
+# Environment settings (RLGym-Sim)
 env:
-  game_speed: 100  # 100 = normal speed, higher = faster simulation
   tick_skip: 8  # Number of physics ticks to skip per action
   spawn_opponents: true  # Whether to spawn opponent bots
   team_size: 1  # 1v1, 2v2, or 3v3

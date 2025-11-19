@@ -1,10 +1,10 @@
 # Vexril-RocketLeague
 
-A Reinforcement Learning bot for Rocket League built with RLGym and Stable-Baselines3.
+A Reinforcement Learning bot for Rocket League built with RLGym-Sim (RocketSim) and Stable-Baselines3.
 
 ## Overview
 
-This project implements a baseline RL agent that learns to play Rocket League using the Proximal Policy Optimization (PPO) algorithm. The bot learns from scratch in a simulated environment provided by RLGym.
+This project implements a baseline RL agent that learns to play Rocket League using the Proximal Policy Optimization (PPO) algorithm. The bot learns from scratch in a simulated environment provided by RLGym-Sim, which uses RocketSim for fast, physics-accurate simulation without requiring the actual Rocket League game.
 
 ## Features
 
@@ -42,8 +42,8 @@ Vexril-RocketLeague/
 ## Prerequisites
 
 - Python 3.8 or higher
-- Rocket League (installed via Epic Games or Steam)
-- Windows OS (RLGym requires Windows for Rocket League integration)
+- No Rocket League installation required! (RLGym-Sim uses RocketSim)
+- Works on Windows, Linux, and macOS
 
 ## Installation
 
@@ -64,8 +64,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. **Install RLGym**
-RLGym requires additional setup to connect to Rocket League. Follow the official [RLGym installation guide](https://rlgym.github.io/).
+**Note**: This will install:
+- RocketSim (physics simulator)
+- RLGym-Sim (RL environment wrapper)
+- Stable-Baselines3 (PPO algorithm)
+- PyTorch and other dependencies
+
+The installation may take a few minutes as it downloads and compiles RocketSim.
 
 ## Usage
 
@@ -151,19 +156,21 @@ Common hyperparameters to tune in `configs/training_config.yaml`:
 
 ## Common Issues
 
-### RLGym Connection Issues
-- Ensure Rocket League is closed before starting training
-- RLGym will launch Rocket League automatically
-- Check firewall settings if connection fails
+### Installation Issues
+- If RocketSim installation fails, ensure you have a C++ compiler installed
+- On Windows: Install Visual Studio Build Tools
+- On Linux: Install `build-essential` package
+- On macOS: Install Xcode Command Line Tools
 
 ### Out of Memory
 - Reduce `n_steps` or `batch_size` in the config
 - Close other applications to free up RAM
+- Consider using a machine with more RAM (16GB+ recommended)
 
 ### Slow Training
-- Increase `game_speed` in the config (higher = faster simulation)
-- Reduce `tick_skip` (fewer physics steps per action)
-- Use a GPU for faster neural network training
+- Use a GPU for faster neural network training (PyTorch with CUDA)
+- Reduce `tick_skip` for fewer physics steps per action
+- Consider using fewer parallel environments if RAM-constrained
 
 ## Performance Expectations
 
@@ -187,7 +194,9 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## Resources
 
-- [RLGym Documentation](https://rlgym.github.io/)
+- [RLGym Documentation](https://rlgym.org/)
+- [RLGym-Sim GitHub](https://github.com/AechPro/rocket-league-gym-sim)
+- [RocketSim GitHub](https://github.com/ZealanL/RocketSim)
 - [Stable-Baselines3 Documentation](https://stable-baselines3.readthedocs.io/)
 - [PPO Algorithm Paper](https://arxiv.org/abs/1707.06347)
 

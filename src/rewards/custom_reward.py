@@ -2,9 +2,9 @@
 Custom reward function for Rocket League bot training
 """
 import numpy as np
-from rlgym.utils.reward_functions import RewardFunction
-from rlgym.utils.gamestates import GameState, PlayerData
-from rlgym.utils.common_values import BLUE_TEAM, ORANGE_TEAM, BLUE_GOAL_BACK, ORANGE_GOAL_BACK
+from rlgym_sim.utils.reward_functions import RewardFunction
+from rlgym_sim.utils.gamestates import GameState, PlayerData
+from rlgym_sim.utils.common_values import BLUE_TEAM, ORANGE_TEAM, BLUE_GOAL_BACK, ORANGE_GOAL_BACK
 
 
 class CustomReward(RewardFunction):
