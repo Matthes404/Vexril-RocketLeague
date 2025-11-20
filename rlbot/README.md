@@ -19,6 +19,8 @@ You need a trained model file (`.zip`) in the `models/` directory. The bot will 
 2. `models/rl_bot_latest.zip` (latest checkpoint)
 3. Any checkpoint file matching `models/rl_bot_*.zip`
 
+**IMPORTANT:** You also need the `models/rl_bot_vecnormalize.pkl` file! This file contains observation normalization statistics that are critical for the bot to work correctly. Without it, the bot will receive observations in the wrong scale and perform very poorly. This file is automatically created during training.
+
 ## Installation on Windows
 
 ### 1. Install RLBotGUI
@@ -50,11 +52,13 @@ Make sure your trained model is in the `models/` directory (one level up from th
 ```
 Vexril-RocketLeague/
 ├── models/
-│   ├── rl_bot_final.zip        ← Your trained model
-│   └── rl_bot_latest.zip        ← Or latest checkpoint
+│   ├── rl_bot_final.zip           ← Your trained model
+│   ├── rl_bot_latest.zip          ← Or latest checkpoint
+│   └── rl_bot_vecnormalize.pkl    ← CRITICAL: Observation normalization stats
 └── rlbot/
     ├── vexril_bot.py
     ├── bot.cfg
+    ├── state_converter.py
     └── ...
 ```
 
@@ -100,8 +104,14 @@ Rocket League Game
         ↓ (game state via RLBot API)
    GameTickPacket
         ↓
-   state_converter.py
-        ↓ (converts to RLGym-Sim observation format)
+   StateConverter.packet_to_observation()
+        ↓ (converts to RLGym-Sim DefaultObs format: 49 dims for 1v1)
+   Raw Observation [49 values]
+        ↓
+   VecNormalize.normalize_obs()
+        ↓ (normalize using training stats - CRITICAL!)
+   Normalized Observation
+        ↓
    PPO Model (trained in simulation)
         ↓ (8D continuous action)
    model_action_to_controller()
@@ -110,6 +120,27 @@ Rocket League Game
         ↓ (sent back to game)
 Rocket League Game
 ```
+
+### Key Technical Details
+
+**Observation Format (DefaultObs):**
+- For 1v1: 49-dimensional vector
+  - Ball: 9 values (position, velocity, angular velocity)
+  - Player: 20 values (position, velocity, rotation vectors, angular velocity, boost, flags)
+  - Opponent: 20 values (same as player)
+- For 2v2: 89 dimensions (1 teammate + 2 opponents)
+- For 3v3: 129 dimensions (2 teammates + 3 opponents)
+
+**Observation Normalization:**
+- Position values normalized by 2300 (field size)
+- Velocity values normalized by 2300 (max speed)
+- Angular velocity normalized by π (rotation rate)
+- Team inversion: Orange team observations are inverted for symmetry
+
+**Action Space:**
+- 8-dimensional continuous: `[throttle, steer, pitch, yaw, roll, jump, boost, handbrake]`
+- Continuous values in [-1, 1] range
+- Binary controls (jump, boost, handbrake) thresholded at 0
 
 ### Key Components
 
@@ -171,6 +202,12 @@ action, _ = self.model.predict(observation, deterministic=False)
 - Check that the `.zip` file exists in `models/` directory
 - Verify the file path in the console output
 
+### "VecNormalize file not found" warning
+- This is a CRITICAL warning - the bot will perform very poorly without normalization
+- Make sure `models/rl_bot_vecnormalize.pkl` exists
+- This file is created automatically during training
+- If missing, you need to retrain or copy it from your training machine
+
 ### "Failed to load model"
 - Ensure compatible versions of `stable-baselines3` and `torch`
 - Check that the model file isn't corrupted
@@ -187,9 +224,13 @@ action, _ = self.model.predict(observation, deterministic=False)
 - Ensure Python version is between 3.7 and 3.10
 
 ### Observation shape mismatch
-- The bot was trained with a specific observation format
+- The bot was trained with a specific observation format (DefaultObs)
 - If you modified `obs_builder` in training, update `state_converter.py` accordingly
-- Check that the number of players in the match matches training conditions
+- Check that the number of players in the match matches training conditions:
+  - 1v1: 49 dimensions
+  - 2v2: 89 dimensions
+  - 3v3: 129 dimensions
+- The bot currently expects observations for 1v1 (or will adapt to the number of cars detected)
 
 ## Performance Notes
 
