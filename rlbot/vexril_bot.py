@@ -121,6 +121,22 @@ class VexrilBot(BaseAgent):
             self.logger.warning(f"VecNormalize file not found at: {self.vecnormalize_path}")
             self.logger.warning("Running without observation normalization (bot may perform poorly)")
 
+        # Log what match type this model expects
+        expected_obs_size = self.model.observation_space.shape[0]
+        match_types = {
+            29: "1v0 (solo practice)",
+            49: "1v1",
+            69: "1v2",
+            89: "2v2",
+            109: "2v3 or 3v2",
+            129: "3v3"
+        }
+        expected_type = match_types.get(expected_obs_size, f"unknown ({expected_obs_size} dims)")
+        self.logger.info("=" * 60)
+        self.logger.info(f"MODEL TRAINED FOR: {expected_type}")
+        self.logger.info(f"PLEASE SET UP A {expected_type.upper()} MATCH IN RLBOTGUI!")
+        self.logger.info("=" * 60)
+
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         """
         Called every game tick to get the bot's controller input.
@@ -138,6 +154,31 @@ class VexrilBot(BaseAgent):
         try:
             # Convert game state to observation format
             observation = self.state_converter.packet_to_observation(packet, self.index)
+
+            # Check if observation size matches model expectations
+            expected_obs_size = self.model.observation_space.shape[0]
+            actual_obs_size = observation.shape[0]
+
+            if actual_obs_size != expected_obs_size:
+                # Calculate what match type this is
+                match_types = {
+                    29: "1v0 (solo)",
+                    49: "1v1",
+                    69: "1v2",
+                    89: "2v2",
+                    109: "2v3 or 3v2",
+                    129: "3v3"
+                }
+                actual_type = match_types.get(actual_obs_size, f"unknown ({actual_obs_size} dims)")
+                expected_type = match_types.get(expected_obs_size, f"unknown ({expected_obs_size} dims)")
+
+                self.logger.error("=" * 60)
+                self.logger.error("OBSERVATION SIZE MISMATCH!")
+                self.logger.error(f"Model expects: {expected_obs_size} dimensions ({expected_type})")
+                self.logger.error(f"Current match: {actual_obs_size} dimensions ({actual_type})")
+                self.logger.error(f"Please set up a {expected_type.upper()} match in RLBotGUI!")
+                self.logger.error("=" * 60)
+                return SimpleControllerState()
 
             # Normalize observation if VecNormalize is available
             # CRITICAL: The model was trained on normalized observations!
