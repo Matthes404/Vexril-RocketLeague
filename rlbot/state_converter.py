@@ -49,17 +49,30 @@ class StateConverter:
     ANG_STD = math.pi
     VEL_STD = 2300
 
-    def __init__(self, use_compat=True):
+    def __init__(self, use_compat=True, legacy_mode=False):
         """
         Initialize the state converter.
 
         Args:
-            use_compat: Whether to use rlgym-compat if available (recommended)
+            use_compat: Whether to use rlgym-compat if available (recommended for new training)
+            legacy_mode: If True, use the original observation format for compatibility
+                        with models trained before the fix. This uses the old player flags:
+                        (has_wheel_contact, is_super_sonic, jumped, double_jumped)
+                        instead of DefaultObs format (on_ground, has_flip, is_demoed).
+                        Set this to True if testing with a model trained with the old code.
         """
         self.team = None
-        self.use_compat = use_compat and RLGYM_COMPAT_AVAILABLE
+        self.legacy_mode = legacy_mode
 
-        # Initialize rlgym-compat components if available
+        # In legacy mode, don't use rlgym-compat even if available
+        if legacy_mode:
+            self.use_compat = False
+            print("StateConverter: LEGACY MODE - using original observation format")
+            print("  (for compatibility with models trained before the fix)")
+        else:
+            self.use_compat = use_compat and RLGYM_COMPAT_AVAILABLE
+
+        # Initialize rlgym-compat components if available and not in legacy mode
         if self.use_compat:
             self.game_state = GameState()
             self.obs_builder = DefaultObs()
@@ -67,7 +80,8 @@ class StateConverter:
         else:
             self.game_state = None
             self.obs_builder = None
-            print("StateConverter: Using manual observation conversion")
+            if not legacy_mode:
+                print("StateConverter: Using manual observation conversion")
 
         # Cache for previous action (some DefaultObs versions include this)
         self.previous_action = np.zeros(8, dtype=np.float32)
@@ -202,19 +216,24 @@ class StateConverter:
         # Player boost amount (0-1)
         obs.append(player.boost / 100.0)
 
-        # Player flags - IMPORTANT: These should match what DefaultObs uses!
-        # DefaultObs uses: on_ground, has_flip, is_demoed
-        # RLBot provides: has_wheel_contact, jumped, double_jumped
-        # We approximate:
-        on_ground = 1.0 if player.has_wheel_contact else 0.0
-        # has_flip: True if player hasn't used their flip yet after jumping
-        # Approximation: hasn't double jumped and either on ground or recently jumped
-        has_flip = 1.0 if (not player.double_jumped and (player.has_wheel_contact or player.jumped)) else 0.0
-        is_demoed = 1.0 if player.is_demolished else 0.0
-
-        obs.append(on_ground)
-        obs.append(has_flip)
-        obs.append(is_demoed)
+        # Player flags - format depends on legacy_mode
+        if self.legacy_mode:
+            # LEGACY FORMAT: Original observation format (for models trained before fix)
+            # Uses: has_wheel_contact, is_super_sonic, jumped, double_jumped
+            obs.append(1.0 if player.has_wheel_contact else 0.0)
+            obs.append(1.0 if player.is_super_sonic else 0.0)
+            obs.append(1.0 if player.jumped else 0.0)
+            obs.append(1.0 if player.double_jumped else 0.0)
+        else:
+            # NEW FORMAT: Matches RLGym DefaultObs
+            # Uses: on_ground, has_flip, is_demoed
+            on_ground = 1.0 if player.has_wheel_contact else 0.0
+            # has_flip: True if player hasn't used their flip yet after jumping
+            has_flip = 1.0 if (not player.double_jumped and (player.has_wheel_contact or player.jumped)) else 0.0
+            is_demoed = 1.0 if player.is_demolished else 0.0
+            obs.append(on_ground)
+            obs.append(has_flip)
+            obs.append(is_demoed)
 
         # === TEAMMATE AND OPPONENT DATA ===
         teammates = []
@@ -283,14 +302,21 @@ class StateConverter:
         # Boost
         obs.append(car.boost / 100.0)
 
-        # Flags (match DefaultObs format)
-        on_ground = 1.0 if car.has_wheel_contact else 0.0
-        has_flip = 1.0 if (not car.double_jumped and (car.has_wheel_contact or car.jumped)) else 0.0
-        is_demoed = 1.0 if car.is_demolished else 0.0
-
-        obs.append(on_ground)
-        obs.append(has_flip)
-        obs.append(is_demoed)
+        # Flags - format depends on legacy_mode
+        if self.legacy_mode:
+            # LEGACY FORMAT
+            obs.append(1.0 if car.has_wheel_contact else 0.0)
+            obs.append(1.0 if car.is_super_sonic else 0.0)
+            obs.append(1.0 if car.jumped else 0.0)
+            obs.append(1.0 if car.double_jumped else 0.0)
+        else:
+            # NEW FORMAT (DefaultObs)
+            on_ground = 1.0 if car.has_wheel_contact else 0.0
+            has_flip = 1.0 if (not car.double_jumped and (car.has_wheel_contact or car.jumped)) else 0.0
+            is_demoed = 1.0 if car.is_demolished else 0.0
+            obs.append(on_ground)
+            obs.append(has_flip)
+            obs.append(is_demoed)
 
         return obs
 
