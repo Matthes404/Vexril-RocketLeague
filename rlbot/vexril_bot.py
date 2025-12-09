@@ -35,6 +35,8 @@ class VexrilBot(BaseAgent):
         self.model_loaded = False
         self.model_path = None
         self.vecnormalize_path = None
+        self.first_tick = True  # For diagnostic logging
+        self.tick_count = 0
 
     def initialize_agent(self):
         """
@@ -154,10 +156,26 @@ class VexrilBot(BaseAgent):
         try:
             # Convert game state to observation format
             observation = self.state_converter.packet_to_observation(packet, self.index)
+            self.tick_count += 1
 
             # Check if observation size matches model expectations
             expected_obs_size = self.model.observation_space.shape[0]
             actual_obs_size = observation.shape[0]
+
+            # Log diagnostic info on first tick
+            if self.first_tick:
+                self.first_tick = False
+                self.logger.info("=" * 60)
+                self.logger.info("FIRST TICK DIAGNOSTICS")
+                self.logger.info(f"Observation size: {actual_obs_size} (expected: {expected_obs_size})")
+                self.logger.info(f"Observation stats:")
+                self.logger.info(f"  min: {observation.min():.4f}, max: {observation.max():.4f}")
+                self.logger.info(f"  mean: {observation.mean():.4f}, std: {observation.std():.4f}")
+                self.logger.info(f"  first 10 values: {observation[:10]}")
+                self.logger.info(f"VecNormalize loaded: {self.vec_normalize is not None}")
+                if self.vec_normalize is not None:
+                    self.logger.info(f"  obs_rms mean shape: {self.vec_normalize.obs_rms.mean.shape}")
+                self.logger.info("=" * 60)
 
             if actual_obs_size != expected_obs_size:
                 # Calculate what match type this is
@@ -192,6 +210,9 @@ class VexrilBot(BaseAgent):
 
             # Convert model action to controller state
             controller = model_action_to_controller(action)
+
+            # Update previous action for next observation (some obs builders use this)
+            self.state_converter.update_previous_action(action)
 
             return controller
 

@@ -1,22 +1,47 @@
 """
 State converter for RLBot to RLGym-Sim observation format.
-Converts RLBot's GameTickPacket to the observation format expected by models trained with RLGym-Sim.
+
+This module uses rlgym-compat for accurate conversion between RLBot's
+GameTickPacket and the observation format expected by models trained with RLGym-Sim.
+
+IMPORTANT: The observation format MUST match exactly what was used during training.
+Using rlgym-compat ensures this compatibility.
 """
 import numpy as np
 from rlbot.agents.base_agent import SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 import math
 
+# Try to import rlgym-compat for proper observation conversion
+try:
+    from rlgym_compat import GameState
+    from rlgym_sim.utils.obs_builders import DefaultObs
+    RLGYM_COMPAT_AVAILABLE = True
+except ImportError:
+    RLGYM_COMPAT_AVAILABLE = False
+    print("WARNING: rlgym-compat not available. Using fallback manual conversion.")
+    print("For best results, install rlgym-compat: pip install rlgym-compat")
+
 
 class StateConverter:
     """
     Converts RLBot game state to RLGym-Sim DefaultObs format.
 
+    This class provides two modes of operation:
+    1. If rlgym-compat is installed: Uses the official conversion for exact compatibility
+    2. Fallback mode: Manual conversion (may have slight differences)
+
     The DefaultObs format from RLGym-Sim includes:
-    - Player car data (position, velocity, rotation, angular velocity, boost, etc.)
     - Ball data (position, velocity, angular velocity)
+    - Player car data (position, velocity, rotation vectors, angular velocity, boost, flags)
     - Teammate data (if any)
     - Opponent data (if any)
+
+    Note: RLGym's DefaultObs may also include:
+    - Previous action (depending on version)
+    - Boost pad states (depending on version)
+
+    Always verify your observation dimensions match between training and gameplay!
     """
 
     # Normalization constants (RLGym-Sim standard values)
@@ -24,12 +49,36 @@ class StateConverter:
     ANG_STD = math.pi
     VEL_STD = 2300
 
-    def __init__(self):
-        self.team = None  # Will be set when bot initializes
+    def __init__(self, use_compat=True):
+        """
+        Initialize the state converter.
+
+        Args:
+            use_compat: Whether to use rlgym-compat if available (recommended)
+        """
+        self.team = None
+        self.use_compat = use_compat and RLGYM_COMPAT_AVAILABLE
+
+        # Initialize rlgym-compat components if available
+        if self.use_compat:
+            self.game_state = GameState()
+            self.obs_builder = DefaultObs()
+            print("StateConverter: Using rlgym-compat for observation conversion")
+        else:
+            self.game_state = None
+            self.obs_builder = None
+            print("StateConverter: Using manual observation conversion")
+
+        # Cache for previous action (some DefaultObs versions include this)
+        self.previous_action = np.zeros(8, dtype=np.float32)
 
     def set_team(self, team: int):
         """Set the bot's team (0 = blue, 1 = orange)"""
         self.team = team
+
+    def update_previous_action(self, action: np.ndarray):
+        """Update the previous action cache (for obs builders that use it)"""
+        self.previous_action = np.array(action, dtype=np.float32)
 
     def packet_to_observation(self, packet: GameTickPacket, index: int) -> np.ndarray:
         """
@@ -45,6 +94,43 @@ class StateConverter:
         if self.team is None:
             raise ValueError("Team must be set before converting observations")
 
+        if self.use_compat:
+            return self._convert_with_compat(packet, index)
+        else:
+            return self._convert_manual(packet, index)
+
+    def _convert_with_compat(self, packet: GameTickPacket, index: int) -> np.ndarray:
+        """
+        Convert using rlgym-compat (most accurate method).
+
+        This uses the official RLGym compatibility layer to ensure
+        observations match exactly what was used during training.
+        """
+        # Decode the RLBot packet into RLGym GameState format
+        self.game_state.decode(packet)
+
+        # Get the player object
+        player = self.game_state.players[index]
+
+        # Build observation using the same DefaultObs used during training
+        obs = self.obs_builder.build_obs(
+            player=player,
+            state=self.game_state,
+            previous_action=self.previous_action
+        )
+
+        return np.array(obs, dtype=np.float32).flatten()
+
+    def _convert_manual(self, packet: GameTickPacket, index: int) -> np.ndarray:
+        """
+        Manual conversion fallback (may have slight differences from RLGym).
+
+        WARNING: This method attempts to replicate RLGym's DefaultObs format
+        manually. Small differences in normalization, ordering, or rotation
+        calculations could cause the model to underperform.
+
+        Consider installing rlgym-compat for exact compatibility.
+        """
         obs = []
 
         player = packet.game_cars[index]
@@ -90,10 +176,9 @@ class StateConverter:
             player.physics.velocity.z / self.VEL_STD
         ])
 
-        # Player rotation (as forward, up, and right vectors)
+        # Player rotation (as forward and up vectors)
         forward = self._rotation_to_forward(player.physics.rotation)
         up = self._rotation_to_up(player.physics.rotation)
-        right = self._rotation_to_right(player.physics.rotation)
 
         obs.extend([
             forward[0] * inv,
@@ -117,14 +202,21 @@ class StateConverter:
         # Player boost amount (0-1)
         obs.append(player.boost / 100.0)
 
-        # Player flags
-        obs.append(1.0 if player.has_wheel_contact else 0.0)
-        obs.append(1.0 if player.is_super_sonic else 0.0)
-        obs.append(1.0 if player.jumped else 0.0)
-        obs.append(1.0 if player.double_jumped else 0.0)
+        # Player flags - IMPORTANT: These should match what DefaultObs uses!
+        # DefaultObs uses: on_ground, has_flip, is_demoed
+        # RLBot provides: has_wheel_contact, jumped, double_jumped
+        # We approximate:
+        on_ground = 1.0 if player.has_wheel_contact else 0.0
+        # has_flip: True if player hasn't used their flip yet after jumping
+        # Approximation: hasn't double jumped and either on ground or recently jumped
+        has_flip = 1.0 if (not player.double_jumped and (player.has_wheel_contact or player.jumped)) else 0.0
+        is_demoed = 1.0 if player.is_demolished else 0.0
+
+        obs.append(on_ground)
+        obs.append(has_flip)
+        obs.append(is_demoed)
 
         # === TEAMMATE AND OPPONENT DATA ===
-        # Get teammates and opponents
         teammates = []
         opponents = []
 
@@ -148,7 +240,7 @@ class StateConverter:
         return np.array(obs, dtype=np.float32)
 
     def _get_car_obs(self, car, inv: int) -> list:
-        """Get observation data for another car"""
+        """Get observation data for another car (teammate or opponent)"""
         obs = []
 
         # Position
@@ -191,11 +283,14 @@ class StateConverter:
         # Boost
         obs.append(car.boost / 100.0)
 
-        # Flags
-        obs.append(1.0 if car.has_wheel_contact else 0.0)
-        obs.append(1.0 if car.is_super_sonic else 0.0)
-        obs.append(1.0 if car.jumped else 0.0)
-        obs.append(1.0 if car.double_jumped else 0.0)
+        # Flags (match DefaultObs format)
+        on_ground = 1.0 if car.has_wheel_contact else 0.0
+        has_flip = 1.0 if (not car.double_jumped and (car.has_wheel_contact or car.jumped)) else 0.0
+        is_demoed = 1.0 if car.is_demolished else 0.0
+
+        obs.append(on_ground)
+        obs.append(has_flip)
+        obs.append(is_demoed)
 
         return obs
 

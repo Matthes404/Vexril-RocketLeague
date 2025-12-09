@@ -7,3 +7,7 @@ stable-baselines3
 torch
 numpy
 gymnasium
+
+# CRITICAL: Use rlgym-compat for proper RLBot to RLGym observation conversion
+# This ensures observations in gameplay match what was used during training
+rlgym-compat

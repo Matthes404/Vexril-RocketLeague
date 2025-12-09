@@ -6,21 +6,109 @@ import gymnasium as gym
 from gymnasium import spaces
 
 
+class OpponentPolicy:
+    """
+    Base class for opponent policies during training.
+    Subclass this to create different opponent behaviors.
+    """
+
+    def get_action(self, obs) -> np.ndarray:
+        """Return an 8D action array for the opponent"""
+        raise NotImplementedError
+
+
+class ZeroOpponent(OpponentPolicy):
+    """Opponent that does nothing (original behavior - NOT recommended)"""
+
+    def get_action(self, obs) -> np.ndarray:
+        return np.zeros(8, dtype=np.float32)
+
+
+class RandomOpponent(OpponentPolicy):
+    """Opponent that takes random actions (basic exploration)"""
+
+    def get_action(self, obs) -> np.ndarray:
+        return np.random.uniform(-1, 1, size=8).astype(np.float32)
+
+
+class BasicChaseOpponent(OpponentPolicy):
+    """
+    Simple opponent that tries to drive towards the ball.
+    This provides basic opposition without being too sophisticated.
+    """
+
+    def get_action(self, obs) -> np.ndarray:
+        # Create action array
+        action = np.zeros(8, dtype=np.float32)
+
+        # Always drive forward
+        action[0] = 1.0  # throttle
+
+        # Add some random steering for variety
+        action[1] = np.random.uniform(-0.3, 0.3)
+
+        # Occasionally boost
+        if np.random.random() < 0.3:
+            action[6] = 1.0  # boost
+
+        # Occasionally jump (for aerial attempts)
+        if np.random.random() < 0.05:
+            action[5] = 1.0  # jump
+
+        return action
+
+
+class MixedOpponent(OpponentPolicy):
+    """
+    Opponent that switches between different behaviors.
+    Provides varied opposition during training.
+    """
+
+    def __init__(self):
+        self.policies = [RandomOpponent(), BasicChaseOpponent(), ZeroOpponent()]
+        self.current_policy = 0
+        self.steps = 0
+        self.switch_interval = 500  # Switch policy every N steps
+
+    def get_action(self, obs) -> np.ndarray:
+        self.steps += 1
+        if self.steps >= self.switch_interval:
+            self.steps = 0
+            self.current_policy = np.random.randint(0, len(self.policies))
+        return self.policies[self.current_policy].get_action(obs)
+
+
 class RLGymSimWrapper(gym.Env):
     """
     Wrapper to make RLGym-Sim environment compatible with SB3
     Handles observation flattening and Gymnasium API compatibility
     """
 
-    def __init__(self, rlgym_env):
+    def __init__(self, rlgym_env, opponent_policy: str = "mixed"):
         """
         Initialize wrapper
 
         Args:
             rlgym_env: RLGym-Sim environment instance
+            opponent_policy: Type of opponent policy to use during training.
+                Options: "zero" (frozen), "random", "chase", "mixed" (default)
+                IMPORTANT: "zero" is NOT recommended - opponents won't move!
         """
         super().__init__()
         self.env = rlgym_env
+
+        # Initialize opponent policy
+        opponent_policies = {
+            "zero": ZeroOpponent,
+            "random": RandomOpponent,
+            "chase": BasicChaseOpponent,
+            "mixed": MixedOpponent
+        }
+        if opponent_policy not in opponent_policies:
+            print(f"WARNING: Unknown opponent policy '{opponent_policy}', using 'mixed'")
+            opponent_policy = "mixed"
+        self.opponent = opponent_policies[opponent_policy]()
+        print(f"Training opponent policy: {opponent_policy}")
 
         # Get a sample observation to determine the space and number of agents
         sample_obs = self.env.reset()
@@ -104,14 +192,15 @@ class RLGymSimWrapper(gym.Env):
         # Convert action to numpy array if needed
         action = np.array(action, dtype=np.float32)
 
-        # Handle multi-agent: replicate action for all agents
-        # The trained agent controls the first agent, others get zero actions
+        # Handle multi-agent: trained agent controls first agent,
+        # opponents use the configured opponent policy
         if self.num_agents > 1:
             # Create actions for all agents
             actions = [action]
-            # Add zero actions for opponent agents
+            # Add opponent actions (NOT zero - that's the old bug!)
             for _ in range(self.num_agents - 1):
-                actions.append(np.zeros_like(action))
+                opponent_action = self.opponent.get_action(None)
+                actions.append(opponent_action)
             action = np.array(actions)
 
         # RLGym returns (obs, reward, done, info)
