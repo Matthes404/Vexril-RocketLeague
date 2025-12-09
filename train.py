@@ -84,7 +84,10 @@ def main():
     rlgym_env = create_rlgym_env(config)
 
     # Wrap in Gymnasium-compatible wrapper for SB3
-    base_env = RLGymSimWrapper(rlgym_env)
+    # Use configured opponent policy (default: "mixed" for varied opposition)
+    opponent_policy = config['env'].get('opponent_policy', 'mixed')
+    print(f"Using opponent policy: {opponent_policy}")
+    base_env = RLGymSimWrapper(rlgym_env, opponent_policy=opponent_policy)
 
     # Wrap in DummyVecEnv (required for VecNormalize)
     env = DummyVecEnv([lambda: base_env])
