@@ -202,19 +202,12 @@ class StateConverter:
         # Player boost amount (0-1)
         obs.append(player.boost / 100.0)
 
-        # Player flags - IMPORTANT: These should match what DefaultObs uses!
-        # DefaultObs uses: on_ground, has_flip, is_demoed
-        # RLBot provides: has_wheel_contact, jumped, double_jumped
-        # We approximate:
-        on_ground = 1.0 if player.has_wheel_contact else 0.0
-        # has_flip: True if player hasn't used their flip yet after jumping
-        # Approximation: hasn't double jumped and either on ground or recently jumped
-        has_flip = 1.0 if (not player.double_jumped and (player.has_wheel_contact or player.jumped)) else 0.0
-        is_demoed = 1.0 if player.is_demolished else 0.0
-
-        obs.append(on_ground)
-        obs.append(has_flip)
-        obs.append(is_demoed)
+        # Player flags - Match DefaultObs format exactly!
+        # DefaultObs uses: has_wheel_contact, is_super_sonic, jumped, double_jumped
+        obs.append(1.0 if player.has_wheel_contact else 0.0)
+        obs.append(1.0 if player.is_super_sonic else 0.0)
+        obs.append(1.0 if player.jumped else 0.0)
+        obs.append(1.0 if player.double_jumped else 0.0)
 
         # === TEAMMATE AND OPPONENT DATA ===
         teammates = []
@@ -283,14 +276,12 @@ class StateConverter:
         # Boost
         obs.append(car.boost / 100.0)
 
-        # Flags (match DefaultObs format)
-        on_ground = 1.0 if car.has_wheel_contact else 0.0
-        has_flip = 1.0 if (not car.double_jumped and (car.has_wheel_contact or car.jumped)) else 0.0
-        is_demoed = 1.0 if car.is_demolished else 0.0
-
-        obs.append(on_ground)
-        obs.append(has_flip)
-        obs.append(is_demoed)
+        # Flags - Match DefaultObs format exactly!
+        # DefaultObs uses: has_wheel_contact, is_super_sonic, jumped, double_jumped
+        obs.append(1.0 if car.has_wheel_contact else 0.0)
+        obs.append(1.0 if car.is_super_sonic else 0.0)
+        obs.append(1.0 if car.jumped else 0.0)
+        obs.append(1.0 if car.double_jumped else 0.0)
 
         return obs
 
