@@ -210,6 +210,9 @@ class StateConverter:
         obs.append(1.0 if player.double_jumped else 0.0)
 
         # === TEAMMATE AND OPPONENT DATA ===
+        # IMPORTANT: DefaultObs uses FIXED observation size (2v2 format = 89 dims)
+        # Even in 1v1, it pads with zeros for missing teammates/opponents
+        # Structure: Ball(9) + Self(20) + 1 Teammate(20) + 2 Opponents(40) = 89
         teammates = []
         opponents = []
 
@@ -222,13 +225,24 @@ class StateConverter:
             else:
                 opponents.append((i, car))
 
-        # Add teammate data (if any)
-        for _, car in teammates:
-            obs.extend(self._get_car_obs(car, inv))
+        # Add teammate data (pad with zeros if no teammate - for 1v1)
+        # DefaultObs expects exactly 1 teammate slot
+        if len(teammates) > 0:
+            for _, car in teammates[:1]:  # Only first teammate
+                obs.extend(self._get_car_obs(car, inv))
+        else:
+            # Pad with 20 zeros for missing teammate
+            obs.extend([0.0] * 20)
 
-        # Add opponent data (if any)
-        for _, car in opponents:
-            obs.extend(self._get_car_obs(car, inv))
+        # Add opponent data (pad with zeros if fewer than 2 opponents)
+        # DefaultObs expects exactly 2 opponent slots
+        for i in range(2):
+            if i < len(opponents):
+                _, car = opponents[i]
+                obs.extend(self._get_car_obs(car, inv))
+            else:
+                # Pad with 20 zeros for missing opponent
+                obs.extend([0.0] * 20)
 
         return np.array(obs, dtype=np.float32)
 

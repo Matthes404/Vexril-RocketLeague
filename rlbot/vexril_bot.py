@@ -123,21 +123,18 @@ class VexrilBot(BaseAgent):
             self.logger.warning(f"VecNormalize file not found at: {self.vecnormalize_path}")
             self.logger.warning("Running without observation normalization (bot may perform poorly)")
 
-        # Log what match type this model expects
+        # Log what observation format this model uses
+        # NOTE: DefaultObs uses FIXED 89-dim format (padded to 2v2 size) for all game modes
         expected_obs_size = self.model.observation_space.shape[0]
-        match_types = {
-            29: "1v0 (solo practice)",
-            49: "1v1",
-            69: "1v2",
-            89: "2v2",
-            109: "2v3 or 3v2",
-            129: "3v3"
-        }
-        expected_type = match_types.get(expected_obs_size, f"unknown ({expected_obs_size} dims)")
-        self.logger.info("=" * 60)
-        self.logger.info(f"MODEL TRAINED FOR: {expected_type}")
-        self.logger.info(f"PLEASE SET UP A {expected_type.upper()} MATCH IN RLBOTGUI!")
-        self.logger.info("=" * 60)
+        if expected_obs_size == 89:
+            self.logger.info("=" * 60)
+            self.logger.info("Model uses 89-dim observations (DefaultObs format)")
+            self.logger.info("This works for 1v1, 2v2, and smaller matches")
+            self.logger.info("=" * 60)
+        else:
+            self.logger.info("=" * 60)
+            self.logger.info(f"Model uses {expected_obs_size}-dim observations")
+            self.logger.info("=" * 60)
 
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         """
