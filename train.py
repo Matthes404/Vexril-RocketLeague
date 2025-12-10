@@ -84,10 +84,12 @@ def main():
     rlgym_env = create_rlgym_env(config)
 
     # Wrap in Gymnasium-compatible wrapper for SB3
-    # Use configured opponent policy (default: "mixed" for varied opposition)
-    opponent_policy = config['env'].get('opponent_policy', 'mixed')
-    print(f"Using opponent policy: {opponent_policy}")
-    base_env = RLGymSimWrapper(rlgym_env, opponent_policy=opponent_policy)
+    # Use self-play by default (uses all training data from all agents)
+    # Set opponent_policy to non-"self" values to disable self-play
+    opponent_policy = config['env'].get('opponent_policy', 'self')
+    self_play = config['env'].get('self_play', True)
+    print(f"Using opponent policy: {opponent_policy}, self_play: {self_play}")
+    base_env = RLGymSimWrapper(rlgym_env, opponent_policy=opponent_policy, self_play=self_play)
 
     # Wrap in DummyVecEnv (required for VecNormalize)
     env = DummyVecEnv([lambda: base_env])

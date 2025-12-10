@@ -7,11 +7,14 @@ env:
   team_size: 1  # 1v1, 2v2, or 3v3
   timeout_seconds: 300  # Max episode length in seconds
 
-  # Opponent policy for training (IMPORTANT for learning to play against real opponents!)
-  # Options: "zero" (frozen - NOT recommended), "random", "chase", "mixed" (default)
-  # "mixed" switches between random, chase, and occasionally zero actions
-  # This helps the bot learn to handle different opponent behaviors
-  opponent_policy: "mixed"
+  # Self-play mode (RECOMMENDED for 1v1!)
+  # When true, all agents use the model's policy and ALL training data is used
+  # This doubles training efficiency in 1v1 (uses both agents' experiences)
+  self_play: true
+
+  # Opponent policy (only used when self_play: false)
+  # Options: "self" (same as self_play: true), "random", "chase", "mixed", "zero"
+  opponent_policy: "self"
 
 # PPO hyperparameters
 ppo:
