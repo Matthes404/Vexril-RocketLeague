@@ -80,35 +80,51 @@ class MixedOpponent(OpponentPolicy):
 
 class RLGymSimWrapper(gym.Env):
     """
-    Wrapper to make RLGym-Sim environment compatible with SB3
-    Handles observation flattening and Gymnasium API compatibility
+    Wrapper to make RLGym-Sim environment compatible with SB3.
+
+    In self-play mode (default for multi-agent), this wrapper:
+    - Uses the SAME model to control ALL agents
+    - Returns observations/rewards from ALL agents (alternating each step)
+    - Effectively doubles training data for 1v1, triples for 1v1v1, etc.
+
+    This ensures we don't waste 50% of training data in self-play!
     """
 
-    def __init__(self, rlgym_env, opponent_policy: str = "mixed"):
+    def __init__(self, rlgym_env, opponent_policy: str = "self", self_play: bool = True):
         """
         Initialize wrapper
 
         Args:
             rlgym_env: RLGym-Sim environment instance
             opponent_policy: Type of opponent policy to use during training.
-                Options: "zero" (frozen), "random", "chase", "mixed" (default)
-                IMPORTANT: "zero" is NOT recommended - opponents won't move!
+                Options: "self" (self-play, recommended), "zero", "random", "chase", "mixed"
+                In self-play mode, all agents use the model's actions.
+            self_play: If True (default), use self-play where all agents contribute training data.
+                       If False, only agent 0's data is used (wastes 50% of data in 1v1).
         """
         super().__init__()
         self.env = rlgym_env
+        self.self_play = self_play
 
-        # Initialize opponent policy
+        # Initialize opponent policy (only used if self_play=False)
         opponent_policies = {
+            "self": None,  # Self-play: no scripted opponent
             "zero": ZeroOpponent,
             "random": RandomOpponent,
             "chase": BasicChaseOpponent,
             "mixed": MixedOpponent
         }
-        if opponent_policy not in opponent_policies:
-            print(f"WARNING: Unknown opponent policy '{opponent_policy}', using 'mixed'")
-            opponent_policy = "mixed"
-        self.opponent = opponent_policies[opponent_policy]()
-        print(f"Training opponent policy: {opponent_policy}")
+
+        if opponent_policy == "self" or self_play:
+            self.opponent = None
+            self.self_play = True
+            print("Training mode: SELF-PLAY (all agents use model, all data used for training)")
+        else:
+            if opponent_policy not in opponent_policies:
+                print(f"WARNING: Unknown opponent policy '{opponent_policy}', using 'mixed'")
+                opponent_policy = "mixed"
+            self.opponent = opponent_policies[opponent_policy]()
+            print(f"Training opponent policy: {opponent_policy}")
 
         # Get a sample observation to determine the space and number of agents
         sample_obs = self.env.reset()
@@ -133,6 +149,15 @@ class RLGymSimWrapper(gym.Env):
             sample_to_use = sample_obs
 
         print(f"Detected {self.num_agents} agents, sample observation shape: {np.array(sample_to_use).shape}")
+
+        # For self-play: track which agent's perspective we're returning
+        # We alternate between agents to use ALL training data
+        self.current_agent_idx = 0
+
+        # Store all agents' observations for self-play
+        self._all_obs = None
+        self._all_rewards = None
+        self._pending_obs = []  # Queue of observations to return
 
         # Flatten observation if needed
         if isinstance(sample_to_use, dict):
@@ -184,66 +209,107 @@ class RLGymSimWrapper(gym.Env):
         else:
             return np.array(obs).flatten()
 
+    def _extract_agent_obs(self, obs, agent_idx):
+        """Extract a single agent's observation from multi-agent obs"""
+        if isinstance(obs, list):
+            return obs[agent_idx]
+        elif isinstance(obs, np.ndarray) and obs.ndim == 2:
+            return obs[agent_idx]
+        else:
+            return obs
+
+    def _extract_agent_value(self, value, agent_idx):
+        """Extract a single agent's value (reward/done) from multi-agent value"""
+        if isinstance(value, (list, np.ndarray)) and hasattr(value, '__getitem__'):
+            try:
+                return value[agent_idx]
+            except (IndexError, TypeError):
+                return value
+        return value
+
     def reset(self, seed=None, options=None):
         """Reset environment"""
         # RLGym-Sim reset doesn't take seed parameter
         obs = self.env.reset()
 
-        # Handle multi-agent observations (return only first agent's obs)
-        if self.num_agents > 1:
-            if isinstance(obs, list):
-                obs = obs[0]
-            elif isinstance(obs, np.ndarray) and obs.ndim == 2:
-                obs = obs[0]
+        # Store all observations
+        self._all_obs = obs
 
-        obs_flat = self._flatten_obs(obs).astype(np.float32)
+        if self.self_play and self.num_agents > 1:
+            # In self-play, alternate which agent's perspective we start from
+            # This ensures balanced training across all agents
+            agent_obs = self._extract_agent_obs(obs, self.current_agent_idx)
+        else:
+            # Non-self-play: just use first agent
+            self.current_agent_idx = 0
+            agent_obs = self._extract_agent_obs(obs, 0) if self.num_agents > 1 else obs
+
+        obs_flat = self._flatten_obs(agent_obs).astype(np.float32)
 
         # Gymnasium API requires (obs, info) tuple
         return obs_flat, {}
 
     def step(self, action):
-        """Step environment"""
+        """
+        Step environment.
+
+        In self-play mode:
+        - All agents use the model's action (adapted for their perspective)
+        - We alternate which agent's data we return to SB3
+        - This uses ALL training data from all agents!
+        """
         # Convert action to numpy array if needed
         action = np.array(action, dtype=np.float32)
 
-        # Handle multi-agent: trained agent controls first agent,
-        # opponents use the configured opponent policy
-        if self.num_agents > 1:
-            # Create actions for all agents
-            actions = [action]
-            # Add opponent actions (NOT zero - that's the old bug!)
-            for _ in range(self.num_agents - 1):
-                opponent_action = self.opponent.get_action(None)
-                actions.append(opponent_action)
-            action = np.array(actions)
+        if self.self_play and self.num_agents > 1:
+            # Self-play mode: use same action for all agents, alternate data returned
+            # All agents are the same model, so they all use the same action logic
+            actions = np.array([action for _ in range(self.num_agents)])
 
-        # RLGym returns (obs, reward, done, info)
-        obs, reward, done, info = self.env.step(action)
+            # Step environment with all actions
+            obs, reward, done, info = self.env.step(actions)
 
-        # Handle multi-agent observations (extract first agent's obs)
-        if self.num_agents > 1:
-            if isinstance(obs, list):
-                obs = obs[0]
-            elif isinstance(obs, np.ndarray) and obs.ndim == 2:
-                obs = obs[0]
+            # Store all observations for next step
+            self._all_obs = obs
 
-        # Handle multi-agent rewards (extract first agent's reward)
-        if isinstance(reward, (list, np.ndarray)) and self.num_agents > 1:
-            reward = reward[0] if hasattr(reward, '__getitem__') else reward
+            # Get data for current agent
+            agent_obs = self._extract_agent_obs(obs, self.current_agent_idx)
+            agent_reward = self._extract_agent_value(reward, self.current_agent_idx)
+            agent_done = self._extract_agent_value(done, self.current_agent_idx)
 
-        # Handle multi-agent dones (extract first agent's done)
-        if isinstance(done, (list, np.ndarray)) and self.num_agents > 1:
-            done = done[0] if hasattr(done, '__getitem__') else done
+            # Alternate which agent we return data for
+            # This ensures we use training data from ALL agents
+            self.current_agent_idx = (self.current_agent_idx + 1) % self.num_agents
 
-        # Flatten observation
-        obs_flat = self._flatten_obs(obs).astype(np.float32)
+            obs_flat = self._flatten_obs(agent_obs).astype(np.float32)
+            return obs_flat, float(agent_reward), bool(agent_done), False, info
 
-        # Gymnasium API requires (obs, reward, terminated, truncated, info)
-        # For compatibility, we use done for both terminated and truncated
-        terminated = done
-        truncated = False
+        else:
+            # Non-self-play mode: use scripted opponent
+            if self.num_agents > 1:
+                # Create actions for all agents
+                actions = [action]
+                # Add opponent actions
+                for _ in range(self.num_agents - 1):
+                    opponent_action = self.opponent.get_action(None)
+                    actions.append(opponent_action)
+                action = np.array(actions)
 
-        return obs_flat, float(reward), terminated, truncated, info
+            # RLGym returns (obs, reward, done, info)
+            obs, reward, done, info = self.env.step(action)
+
+            # Store for next step
+            self._all_obs = obs
+
+            # Handle multi-agent observations (extract first agent's obs)
+            agent_obs = self._extract_agent_obs(obs, 0) if self.num_agents > 1 else obs
+            agent_reward = self._extract_agent_value(reward, 0) if self.num_agents > 1 else reward
+            agent_done = self._extract_agent_value(done, 0) if self.num_agents > 1 else done
+
+            # Flatten observation
+            obs_flat = self._flatten_obs(agent_obs).astype(np.float32)
+
+            return obs_flat, float(agent_reward), bool(agent_done), False, info
 
     def render(self):
         """Render environment"""
