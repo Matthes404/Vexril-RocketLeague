@@ -114,14 +114,25 @@ class RLGymSimWrapper(gym.Env):
         sample_obs = self.env.reset()
 
         # Determine number of agents from observation structure
-        # RLGym-Sim returns a list of observations when there are multiple agents
-        if isinstance(sample_obs, list):
-            self.num_agents = len(sample_obs)
-            # Use first agent's observation as the sample
-            sample_to_use = sample_obs[0]
+        # RLGym-Sim returns a list or array of observations when there are multiple agents
+        if isinstance(sample_obs, (list, np.ndarray)) and hasattr(sample_obs, '__len__'):
+            # Check if it's a multi-agent observation (list of arrays or 2D array)
+            if isinstance(sample_obs, list):
+                self.num_agents = len(sample_obs)
+                sample_to_use = sample_obs[0]
+            elif isinstance(sample_obs, np.ndarray) and sample_obs.ndim == 2:
+                # 2D array: (num_agents, obs_dim)
+                self.num_agents = sample_obs.shape[0]
+                sample_to_use = sample_obs[0]
+            else:
+                # 1D array: single agent observation
+                self.num_agents = 1
+                sample_to_use = sample_obs
         else:
             self.num_agents = 1
             sample_to_use = sample_obs
+
+        print(f"Detected {self.num_agents} agents, sample observation shape: {np.array(sample_to_use).shape}")
 
         # Flatten observation if needed
         if isinstance(sample_to_use, dict):
@@ -179,8 +190,11 @@ class RLGymSimWrapper(gym.Env):
         obs = self.env.reset()
 
         # Handle multi-agent observations (return only first agent's obs)
-        if isinstance(obs, list) and self.num_agents > 1:
-            obs = obs[0]
+        if self.num_agents > 1:
+            if isinstance(obs, list):
+                obs = obs[0]
+            elif isinstance(obs, np.ndarray) and obs.ndim == 2:
+                obs = obs[0]
 
         obs_flat = self._flatten_obs(obs).astype(np.float32)
 
@@ -207,16 +221,19 @@ class RLGymSimWrapper(gym.Env):
         obs, reward, done, info = self.env.step(action)
 
         # Handle multi-agent observations (extract first agent's obs)
-        if isinstance(obs, list) and self.num_agents > 1:
-            obs = obs[0]
+        if self.num_agents > 1:
+            if isinstance(obs, list):
+                obs = obs[0]
+            elif isinstance(obs, np.ndarray) and obs.ndim == 2:
+                obs = obs[0]
 
         # Handle multi-agent rewards (extract first agent's reward)
         if isinstance(reward, (list, np.ndarray)) and self.num_agents > 1:
-            reward = reward[0]
+            reward = reward[0] if hasattr(reward, '__getitem__') else reward
 
         # Handle multi-agent dones (extract first agent's done)
         if isinstance(done, (list, np.ndarray)) and self.num_agents > 1:
-            done = done[0]
+            done = done[0] if hasattr(done, '__getitem__') else done
 
         # Flatten observation
         obs_flat = self._flatten_obs(obs).astype(np.float32)
