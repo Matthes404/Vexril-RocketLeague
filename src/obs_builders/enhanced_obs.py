@@ -238,7 +238,9 @@ class EnhancedObs(ObsBuilder):
 
         # Flags
         obs.append(1.0 if player.on_ground else 0.0)
-        obs.append(1.0 if player.is_supersonic else 0.0)
+        # Calculate supersonic from velocity (threshold ~2200 uu/s)
+        speed = np.linalg.norm(player.car_data.linear_velocity)
+        obs.append(1.0 if speed >= 2200.0 else 0.0)
         obs.append(1.0 if player.has_jump else 0.0)
         obs.append(1.0 if player.has_flip else 0.0)
 
