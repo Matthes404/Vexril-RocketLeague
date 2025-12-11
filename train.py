@@ -16,6 +16,7 @@ import torch
 from src.rewards.custom_reward import CustomReward
 from src.state_setters.custom_state_setter import CustomStateSetter
 from src.utils import RLGymSimWrapper
+from src.obs_builders import EnhancedObs
 
 
 class VecNormalizeCallback(BaseCallback):
@@ -54,7 +55,7 @@ def create_rlgym_env(config):
             GoalScoredCondition()
         ],
         reward_fn=CustomReward(),
-        obs_builder=DefaultObs(),  # Default observation builder
+        obs_builder=EnhancedObs(),  # Enhanced obs with boost pads + game state
         state_setter=CustomStateSetter(),
         copy_gamestate_every_step=True  # Improves performance
     )
