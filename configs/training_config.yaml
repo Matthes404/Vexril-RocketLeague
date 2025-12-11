@@ -2,6 +2,7 @@
 
 # Environment settings (RLGym-Sim)
 env:
+  num_envs: 8  # Number of parallel environments for faster training
   tick_skip: 8  # Number of physics ticks to skip per action
   spawn_opponents: true  # Whether to spawn opponent bots
   team_size: 1  # 1v1, 2v2, or 3v3
@@ -16,16 +17,16 @@ env:
   # Options: "self" (same as self_play: true), "random", "chase", "mixed", "zero"
   opponent_policy: "self"
 
-# PPO hyperparameters
+# PPO hyperparameters (optimized for 8 parallel environments)
 ppo:
-  learning_rate: 0.0003  # Learning rate for the optimizer
-  n_steps: 4096  # Number of steps to collect per environment per update
-  batch_size: 256  # Minibatch size for each gradient update
-  n_epochs: 10  # Number of epochs to train on each collected batch
+  learning_rate: 0.0001  # Learning rate (lower for stability with more envs)
+  n_steps: 2048  # Steps per env per update → 2048 × 8 = 16,384 total
+  batch_size: 2048  # Larger batches for more stable gradients
+  n_epochs: 4  # Fewer epochs (more data per update)
   gamma: 0.995  # Discount factor (increased from 0.99 for longer-term planning)
   gae_lambda: 0.95  # GAE lambda parameter
   clip_range: 0.2  # Clipping parameter for PPO
-  ent_coef: 0.02  # Entropy coefficient (INCREASED from 0.01 for more exploration early on)
+  ent_coef: 0.01  # Entropy coefficient for exploration
   vf_coef: 1.0  # Value function coefficient (INCREASED from 0.5 to prioritize value learning)
   max_grad_norm: 0.5  # Maximum gradient norm for clipping
 

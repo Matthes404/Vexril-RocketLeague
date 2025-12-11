@@ -10,7 +10,7 @@ from rlgym_sim.utils.terminal_conditions.common_conditions import TimeoutConditi
 from rlgym_sim.utils.obs_builders import DefaultObs
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 import torch
 
 from src.rewards.custom_reward import CustomReward
@@ -80,20 +80,30 @@ def main():
     models_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create environment
-    print("Creating RLGym environment...")
-    rlgym_env = create_rlgym_env(config)
-
-    # Wrap in Gymnasium-compatible wrapper for SB3
-    # Use self-play by default (uses all training data from all agents)
-    # Set opponent_policy to non-"self" values to disable self-play
+    # Get environment settings
+    num_envs = config['env'].get('num_envs', 1)
     opponent_policy = config['env'].get('opponent_policy', 'self')
     self_play = config['env'].get('self_play', True)
-    print(f"Using opponent policy: {opponent_policy}, self_play: {self_play}")
-    base_env = RLGymSimWrapper(rlgym_env, opponent_policy=opponent_policy, self_play=self_play)
 
-    # Wrap in DummyVecEnv (required for VecNormalize)
-    env = DummyVecEnv([lambda: base_env])
+    print(f"Creating {num_envs} parallel RLGym environment(s)...")
+    print(f"Using opponent policy: {opponent_policy}, self_play: {self_play}")
+
+    def make_env():
+        """Factory function to create a wrapped RLGym environment"""
+        def _init():
+            rlgym_env = create_rlgym_env(config)
+            return RLGymSimWrapper(rlgym_env, opponent_policy=opponent_policy, self_play=self_play)
+        return _init
+
+    # Create vectorized environment
+    # Use SubprocVecEnv for true parallelism with multiple envs
+    # Use DummyVecEnv for single env (lower overhead)
+    if num_envs > 1:
+        env = SubprocVecEnv([make_env() for _ in range(num_envs)])
+        print(f"Using SubprocVecEnv with {num_envs} parallel processes")
+    else:
+        env = DummyVecEnv([make_env()])
+        print("Using DummyVecEnv with 1 environment")
 
     # CRITICAL: Add VecNormalize for observation and reward normalization
     # This will dramatically improve learning stability and value function performance
@@ -174,7 +184,17 @@ def main():
         )
 
     # Train the model
-    print(f"Starting training for {config['training']['total_timesteps']} timesteps...")
+    total_steps_per_update = config['ppo']['n_steps'] * num_envs
+    print(f"\n{'='*50}")
+    print(f"Training Configuration:")
+    print(f"  - Environments: {num_envs}")
+    print(f"  - Steps per env: {config['ppo']['n_steps']}")
+    print(f"  - Total steps per update: {total_steps_per_update:,}")
+    print(f"  - Batch size: {config['ppo']['batch_size']}")
+    print(f"  - Epochs per update: {config['ppo']['n_epochs']}")
+    print(f"  - Learning rate: {config['ppo']['learning_rate']}")
+    print(f"{'='*50}\n")
+    print(f"Starting training for {config['training']['total_timesteps']:,} timesteps...")
     model.learn(
         total_timesteps=config['training']['total_timesteps'],
         callback=callbacks,
