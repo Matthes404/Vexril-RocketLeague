@@ -34,50 +34,46 @@ class EnhancedObs(ObsBuilder):
     VEL_STD = 2300.0  # Max car speed approximately
     ANG_STD = math.pi  # Max angular value
 
-    # Boost pad locations (all 34 pads in RLBot order)
-    # Format: (x, y, z, is_big)
+    # Boost pad locations in RLGym-Sim order (all 34 pads)
+    # NOTE: RLGym-Sim orders pads as: 28 small pads first, then 6 big pads
+    # This matches state.boost_pads indexing. Format: (x, y, z, is_big)
     BOOST_PADS = [
-        # Blue side back
-        (0.0, -4240.0, 70.0, False),
-        (-1792.0, -4184.0, 70.0, False),
-        (1792.0, -4184.0, 70.0, False),
-        (-3072.0, -4096.0, 73.0, True),   # Big boost
-        (3072.0, -4096.0, 73.0, True),    # Big boost
-        # Blue side mid-back
-        (-940.0, -3308.0, 70.0, False),
-        (940.0, -3308.0, 70.0, False),
-        (0.0, -2816.0, 70.0, False),
-        (-3584.0, -2484.0, 70.0, False),
-        (3584.0, -2484.0, 70.0, False),
-        # Blue side mid
-        (-1788.0, -2300.0, 70.0, False),
-        (1788.0, -2300.0, 70.0, False),
-        (-2048.0, -1036.0, 70.0, False),
-        (0.0, -1024.0, 70.0, False),
-        (2048.0, -1036.0, 70.0, False),
-        # Center
-        (-3584.0, 0.0, 73.0, True),       # Big boost
-        (-1024.0, 0.0, 70.0, False),
-        (1024.0, 0.0, 70.0, False),
-        (3584.0, 0.0, 73.0, True),        # Big boost
-        # Orange side mid
-        (-2048.0, 1036.0, 70.0, False),
-        (0.0, 1024.0, 70.0, False),
-        (2048.0, 1036.0, 70.0, False),
-        (-1788.0, 2300.0, 70.0, False),
-        (1788.0, 2300.0, 70.0, False),
-        # Orange side mid-back
-        (-3584.0, 2484.0, 70.0, False),
-        (3584.0, 2484.0, 70.0, False),
-        (0.0, 2816.0, 70.0, False),
-        (-940.0, 3308.0, 70.0, False),
-        (940.0, 3308.0, 70.0, False),
-        # Orange side back
-        (-3072.0, 4096.0, 73.0, True),    # Big boost
-        (3072.0, 4096.0, 73.0, True),     # Big boost
-        (-1792.0, 4184.0, 70.0, False),
-        (1792.0, 4184.0, 70.0, False),
-        (0.0, 4240.0, 70.0, False),
+        # Small pads (indices 0-27)
+        (0.0, -4240.0, 70.0, False),      # 0
+        (-1792.0, -4184.0, 70.0, False),  # 1
+        (1792.0, -4184.0, 70.0, False),   # 2
+        (-940.0, -3308.0, 70.0, False),   # 3
+        (940.0, -3308.0, 70.0, False),    # 4
+        (0.0, -2816.0, 70.0, False),      # 5
+        (-3584.0, -2484.0, 70.0, False),  # 6
+        (3584.0, -2484.0, 70.0, False),   # 7
+        (-1788.0, -2300.0, 70.0, False),  # 8
+        (1788.0, -2300.0, 70.0, False),   # 9
+        (-2048.0, -1036.0, 70.0, False),  # 10
+        (0.0, -1024.0, 70.0, False),      # 11
+        (2048.0, -1036.0, 70.0, False),   # 12
+        (-1024.0, 0.0, 70.0, False),      # 13
+        (1024.0, 0.0, 70.0, False),       # 14
+        (-2048.0, 1036.0, 70.0, False),   # 15
+        (0.0, 1024.0, 70.0, False),       # 16
+        (2048.0, 1036.0, 70.0, False),    # 17
+        (-1788.0, 2300.0, 70.0, False),   # 18
+        (1788.0, 2300.0, 70.0, False),    # 19
+        (-3584.0, 2484.0, 70.0, False),   # 20
+        (3584.0, 2484.0, 70.0, False),    # 21
+        (0.0, 2816.0, 70.0, False),       # 22
+        (-940.0, 3308.0, 70.0, False),    # 23
+        (940.0, 3308.0, 70.0, False),     # 24
+        (-1792.0, 4184.0, 70.0, False),   # 25
+        (1792.0, 4184.0, 70.0, False),    # 26
+        (0.0, 4240.0, 70.0, False),       # 27
+        # Big boost pads (indices 28-33)
+        (-3072.0, -4096.0, 73.0, True),   # 28
+        (3072.0, -4096.0, 73.0, True),    # 29
+        (-3584.0, 0.0, 73.0, True),       # 30
+        (3584.0, 0.0, 73.0, True),        # 31
+        (-3072.0, 4096.0, 73.0, True),    # 32
+        (3072.0, 4096.0, 73.0, True),     # 33
     ]
 
     def __init__(self):
