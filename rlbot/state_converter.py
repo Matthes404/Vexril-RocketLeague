@@ -34,56 +34,60 @@ class StateConverter:
     VEL_STD = 2300.0
     ANG_STD = math.pi
 
-    # Boost pad locations (all 34 pads in standard order)
+    # Supersonic threshold (same as EnhancedObs)
+    SUPERSONIC_THRESHOLD = 2200.0
+
+    # Boost pad locations in RLGym-Sim order (all 34 pads)
+    # This is the order RLGym-Sim uses internally for state.boost_pads
     # Format: (x, y, z, is_big)
-    BOOST_PADS = [
-        # Blue side back
-        (0.0, -4240.0, 70.0, False),
-        (-1792.0, -4184.0, 70.0, False),
-        (1792.0, -4184.0, 70.0, False),
-        (-3072.0, -4096.0, 73.0, True),   # Big boost
-        (3072.0, -4096.0, 73.0, True),    # Big boost
-        # Blue side mid-back
-        (-940.0, -3308.0, 70.0, False),
-        (940.0, -3308.0, 70.0, False),
-        (0.0, -2816.0, 70.0, False),
-        (-3584.0, -2484.0, 70.0, False),
-        (3584.0, -2484.0, 70.0, False),
-        # Blue side mid
-        (-1788.0, -2300.0, 70.0, False),
-        (1788.0, -2300.0, 70.0, False),
-        (-2048.0, -1036.0, 70.0, False),
-        (0.0, -1024.0, 70.0, False),
-        (2048.0, -1036.0, 70.0, False),
-        # Center
-        (-3584.0, 0.0, 73.0, True),       # Big boost
-        (-1024.0, 0.0, 70.0, False),
-        (1024.0, 0.0, 70.0, False),
-        (3584.0, 0.0, 73.0, True),        # Big boost
-        # Orange side mid
-        (-2048.0, 1036.0, 70.0, False),
-        (0.0, 1024.0, 70.0, False),
-        (2048.0, 1036.0, 70.0, False),
-        (-1788.0, 2300.0, 70.0, False),
-        (1788.0, 2300.0, 70.0, False),
-        # Orange side mid-back
-        (-3584.0, 2484.0, 70.0, False),
-        (3584.0, 2484.0, 70.0, False),
-        (0.0, 2816.0, 70.0, False),
-        (-940.0, 3308.0, 70.0, False),
-        (940.0, 3308.0, 70.0, False),
-        # Orange side back
-        (-3072.0, 4096.0, 73.0, True),    # Big boost
-        (3072.0, 4096.0, 73.0, True),     # Big boost
-        (-1792.0, 4184.0, 70.0, False),
-        (1792.0, 4184.0, 70.0, False),
-        (0.0, 4240.0, 70.0, False),
+    BOOST_PADS_RLGYM_ORDER = [
+        # These are ordered by RLGym-Sim's internal indexing
+        # Small pads first, then big pads, roughly sorted by position
+        (0.0, -4240.0, 70.0, False),      # 0
+        (-1792.0, -4184.0, 70.0, False),  # 1
+        (1792.0, -4184.0, 70.0, False),   # 2
+        (-940.0, -3308.0, 70.0, False),   # 3
+        (940.0, -3308.0, 70.0, False),    # 4
+        (0.0, -2816.0, 70.0, False),      # 5
+        (-3584.0, -2484.0, 70.0, False),  # 6
+        (3584.0, -2484.0, 70.0, False),   # 7
+        (-1788.0, -2300.0, 70.0, False),  # 8
+        (1788.0, -2300.0, 70.0, False),   # 9
+        (-2048.0, -1036.0, 70.0, False),  # 10
+        (0.0, -1024.0, 70.0, False),      # 11
+        (2048.0, -1036.0, 70.0, False),   # 12
+        (-1024.0, 0.0, 70.0, False),      # 13
+        (1024.0, 0.0, 70.0, False),       # 14
+        (-2048.0, 1036.0, 70.0, False),   # 15
+        (0.0, 1024.0, 70.0, False),       # 16
+        (2048.0, 1036.0, 70.0, False),    # 17
+        (-1788.0, 2300.0, 70.0, False),   # 18
+        (1788.0, 2300.0, 70.0, False),    # 19
+        (-3584.0, 2484.0, 70.0, False),   # 20
+        (3584.0, 2484.0, 70.0, False),    # 21
+        (0.0, 2816.0, 70.0, False),       # 22
+        (-940.0, 3308.0, 70.0, False),    # 23
+        (940.0, 3308.0, 70.0, False),     # 24
+        (-1792.0, 4184.0, 70.0, False),   # 25
+        (1792.0, 4184.0, 70.0, False),    # 26
+        (0.0, 4240.0, 70.0, False),       # 27
+        # Big boost pads (6 total)
+        (-3072.0, -4096.0, 73.0, True),   # 28
+        (3072.0, -4096.0, 73.0, True),    # 29
+        (-3584.0, 0.0, 73.0, True),       # 30
+        (3584.0, 0.0, 73.0, True),        # 31
+        (-3072.0, 4096.0, 73.0, True),    # 32
+        (3072.0, 4096.0, 73.0, True),     # 33
     ]
 
     def __init__(self):
         """Initialize the state converter."""
         self.team = None
         self.previous_action = np.zeros(8, dtype=np.float32)
+        # Mapping from RLBot boost index to RLGym-Sim boost index
+        # Built on first packet when we have boost pad positions
+        self.boost_pad_mapping = None
+        self.boost_mapping_built = False
         print("StateConverter: Using EnhancedObs format (89 dims with boost pads)")
 
     def set_team(self, team: int):
@@ -93,6 +97,44 @@ class StateConverter:
     def update_previous_action(self, action: np.ndarray):
         """Update the previous action cache"""
         self.previous_action = np.array(action, dtype=np.float32)
+
+    def _build_boost_pad_mapping(self, packet: GameTickPacket):
+        """
+        Build a mapping from RLBot boost pad indices to RLGym-Sim indices.
+
+        RLBot and RLGym-Sim may order boost pads differently, so we need to
+        match them by position to ensure consistency.
+        """
+        if self.boost_mapping_built:
+            return
+
+        self.boost_pad_mapping = [None] * 34
+
+        # For each RLGym-Sim boost pad position, find the closest RLBot boost pad
+        for rlgym_idx, (rx, ry, rz, _) in enumerate(self.BOOST_PADS_RLGYM_ORDER):
+            best_rlbot_idx = None
+            best_dist = float('inf')
+
+            for rlbot_idx in range(min(packet.num_boost, 34)):
+                pad = packet.game_boosts[rlbot_idx]
+                bx = pad.location.x
+                by = pad.location.y
+                bz = pad.location.z
+
+                dist = math.sqrt((rx - bx)**2 + (ry - by)**2 + (rz - bz)**2)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_rlbot_idx = rlbot_idx
+
+            # Should be very close (within a few units)
+            if best_dist < 50.0:
+                self.boost_pad_mapping[rlgym_idx] = best_rlbot_idx
+            else:
+                # No match found, default to same index
+                self.boost_pad_mapping[rlgym_idx] = rlgym_idx
+
+        self.boost_mapping_built = True
+        print(f"StateConverter: Built boost pad mapping (34 pads)")
 
     def packet_to_observation(self, packet: GameTickPacket, index: int) -> np.ndarray:
         """
@@ -107,6 +149,10 @@ class StateConverter:
         """
         if self.team is None:
             raise ValueError("Team must be set before converting observations")
+
+        # Build boost pad mapping on first call
+        if not self.boost_mapping_built:
+            self._build_boost_pad_mapping(packet)
 
         obs = []
 
@@ -133,10 +179,11 @@ class StateConverter:
         obs.extend(self._get_player_obs(player, inv))
 
         # === BOOST PADS (34 dims) ===
-        # Get boost pad states from game info
-        for i in range(34):
-            if i < packet.num_boost:
-                pad = packet.game_boosts[i]
+        # Get boost pad states using the RLGym-Sim ordering
+        for rlgym_idx in range(34):
+            rlbot_idx = self.boost_pad_mapping[rlgym_idx] if self.boost_pad_mapping else rlgym_idx
+            if rlbot_idx is not None and rlbot_idx < packet.num_boost:
+                pad = packet.game_boosts[rlbot_idx]
                 # 1.0 if active (can be picked up), 0.0 if inactive
                 obs.append(1.0 if pad.is_active else 0.0)
             else:
@@ -206,7 +253,7 @@ class StateConverter:
         """
         Get observation data for a player.
 
-        Returns 20 dimensions:
+        Returns 20 dimensions (matching EnhancedObs exactly):
         - Position (3)
         - Velocity (3)
         - Forward vector (3)
@@ -225,10 +272,13 @@ class StateConverter:
         ])
 
         # Velocity
+        vel_x = player.physics.velocity.x
+        vel_y = player.physics.velocity.y
+        vel_z = player.physics.velocity.z
         obs.extend([
-            player.physics.velocity.x / self.VEL_STD * inv,
-            player.physics.velocity.y / self.VEL_STD * inv,
-            player.physics.velocity.z / self.VEL_STD,
+            vel_x / self.VEL_STD * inv,
+            vel_y / self.VEL_STD * inv,
+            vel_z / self.VEL_STD,
         ])
 
         # Forward vector
@@ -257,14 +307,31 @@ class StateConverter:
         # Boost (0-1)
         obs.append(player.boost / 100.0)
 
-        # Flags
-        obs.append(1.0 if player.has_wheel_contact else 0.0)  # on_ground
-        obs.append(1.0 if player.is_super_sonic else 0.0)     # is_supersonic
-        # has_jump: True if on ground or hasn't used jump yet
+        # === FLAGS (must match EnhancedObs exactly!) ===
+
+        # on_ground: matches player.on_ground in RLGym-Sim
+        obs.append(1.0 if player.has_wheel_contact else 0.0)
+
+        # is_supersonic: Calculate from velocity (same as EnhancedObs)
+        # EnhancedObs uses: speed >= 2200.0
+        speed = math.sqrt(vel_x**2 + vel_y**2 + vel_z**2)
+        obs.append(1.0 if speed >= self.SUPERSONIC_THRESHOLD else 0.0)
+
+        # has_jump: In RLGym-Sim, this is True if player can still first-jump
+        # - On ground: always True
+        # - In air without having jumped: True (briefly after leaving ground)
+        # - After jumping: False
+        # RLBot approximation: on ground OR hasn't pressed jump yet
         has_jump = player.has_wheel_contact or not player.jumped
         obs.append(1.0 if has_jump else 0.0)
-        # has_flip: True if hasn't double jumped and (on ground or has jumped)
-        has_flip = not player.double_jumped and (player.has_wheel_contact or player.jumped)
+
+        # has_flip: In RLGym-Sim, this is True if player can still flip/dodge
+        # - On ground: False (must jump first to flip)
+        # - In air after jumping, before flip expires: True
+        # - After double jumping/flipping: False
+        # RLBot approximation: in air (or jumped) AND hasn't double jumped
+        # Note: We can't track the 1.5s flip timer, so this is approximate
+        has_flip = (not player.has_wheel_contact or player.jumped) and not player.double_jumped
         obs.append(1.0 if has_flip else 0.0)
 
         return obs
